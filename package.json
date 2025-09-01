@@ -6,6 +6,7 @@
   "main": "crawler/stark-crawler.js",
   "scripts": {
     "crawl": "node crawler/stark-crawler.js",
+    "crawl:postgres": "node crawler/stark-crawler-postgres.js",
     "test": "node crawler/test-crawler.js",
     "export": "node scripts/export-csv.js",
     "setup": "sh scripts/setup.sh",
@@ -21,7 +22,8 @@
     "p-queue": "^8.0.0",
     "undici": "^6.0.0",
     "winston": "^3.11.0",
-    "dotenv": "^16.3.0"
+    "dotenv": "^16.3.0",
+    "pg": "^8.11.3"
   },
   "devDependencies": {
     "eslint": "^8.55.0",

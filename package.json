@@ -1,0 +1,38 @@
+{
+  "name": "stark-product-crawler",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Automated crawler for STARK product data",
+  "main": "crawler/stark-crawler.js",
+  "scripts": {
+    "crawl": "node crawler/stark-crawler.js",
+    "crawl:postgres": "node crawler/stark-crawler-postgres.js",
+    "test": "node crawler/test-crawler.js",
+    "export": "node scripts/export-csv.js",
+    "setup": "sh scripts/setup.sh",
+    "docker:build": "docker build -t stark-crawler -f docker/Dockerfile .",
+    "docker:run": "docker run --env-file .env stark-crawler",
+    "lint": "eslint crawler/**/*.js",
+    "format": "prettier --write '**/*.{js,json,md}'"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "playwright": "^1.40.0",
+    "fast-xml-parser": "^4.3.0",
+    "p-queue": "^8.0.0",
+    "undici": "^6.0.0",
+    "winston": "^3.11.0",
+    "dotenv": "^16.3.0",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.0",
+    "@types/node": "^20.10.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "author": "STARK Crawler",
+  "license": "MIT"
+}

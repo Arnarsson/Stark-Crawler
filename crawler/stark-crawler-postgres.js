@@ -21,13 +21,15 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// PostgreSQL configuration
+// PostgreSQL configuration - Connect to local Supabase
 const dbConfig = {
-  host: process.env.DB_HOST || '135.181.101.70',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'postgres',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || '65LEOEDaSVDnvzbrIzzIBGY7937RmEFV',
+  // Connect to host machine's Supabase from Docker container
+  // host.docker.internal resolves to host machine's localhost
+  host: process.env.SUPABASE_DB_HOST || 'host.docker.internal',
+  port: process.env.SUPABASE_DB_PORT || 5432,
+  database: process.env.SUPABASE_DB_NAME || 'postgres',
+  user: process.env.SUPABASE_DB_USER || 'postgres',
+  password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD_DIRECT || '65LEOEDaSVDnvzbrIzzIBGY7937RmEFV',
 };
 
 // Rest of configuration same as original
@@ -204,11 +206,22 @@ async function extractProduct(page, url) {
 
   try {
     await page.goto(url, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle',
       timeout: config.crawler.timeout
     });
 
-    await page.waitForTimeout(2000);
+    // Wait for Angular to render
+    await page.waitForFunction(
+      () => {
+        const body = document.body.innerHTML;
+        return !body.includes('{{') && !body.includes('}}');
+      },
+      { timeout: 10000 }
+    ).catch(() => {
+      logger.debug('Angular templates may still be present');
+    });
+
+    await page.waitForTimeout(1000);
 
     try {
       await page.waitForSelector('[data-test="product-name"], h1', {
@@ -234,8 +247,15 @@ async function extractProduct(page, url) {
         return null;
       }
 
+      const h1Text = document.querySelector('h1')?.textContent?.trim() || '';
+      
+      // Skip if Angular templates are still present
+      if (h1Text.includes('{{') || h1Text.includes('}}')) {
+        return null;
+      }
+      
       const data = {
-        name: document.querySelector('h1, [data-test="product-name"]')?.textContent?.trim(),
+        name: h1Text,
         sku: getByLabel('Varenr'),
         ean: getByLabel('EAN-nr'),
         vvs: getByLabel('VVS-nr'),
@@ -246,9 +266,14 @@ async function extractProduct(page, url) {
         brand: null,
       };
 
-      const priceEl = document.querySelector('[class*="price"], [data-price]');
-      if (priceEl) {
-        data.price_text = priceEl.textContent?.trim();
+      // Extract price - look for actual price values, not templates
+      const priceElements = document.querySelectorAll('[class*="price"], [data-price], .product-price, .price');
+      for (const priceEl of priceElements) {
+        const text = priceEl.textContent?.trim() || '';
+        if (!text.includes('{{') && !text.includes('}}') && text.match(/\d/)) {
+          data.price_text = text;
+          break;
+        }
       }
 
       const stockEl = document.querySelector('[class*="stock"], [data-stock]');
@@ -440,10 +465,26 @@ async function crawl() {
             const product = await extractProduct(page, url);
             stats.productsProcessed++;
 
-            if (product.sku || product.ean) {
+            // Skip if no product data or templates still visible
+            if (!product) {
+              logger.debug(`Skipping ${url} - no valid product data`);
+              return;
+            }
+
+            // Skip non-product pages
+            if (url.includes('/brands/') || url.includes('/klima/') || 
+                url.includes('/konkurrencebetingelser/')) {
+              logger.debug(`Skipping non-product page: ${url}`);
+              return;
+            }
+
+            // Only save valid products
+            if ((product.sku || product.ean) && 
+                !product.name?.includes('{{') && 
+                !product.price_text?.includes('{{')) {
               await upsertProduct(product);
             } else {
-              logger.warn(`No SKU/EAN found for: ${url}`);
+              logger.warn(`No valid SKU/EAN or template data found for: ${url}`);
             }
 
             if (stats.productsProcessed % 10 === 0) {

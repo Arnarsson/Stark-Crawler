@@ -383,15 +383,23 @@ async function upsertProduct(product) {
       }
     }
 
-    // Perform upsert
-    const { error } = await supabase
-      .from('stark_products')
-      .upsert(upsertData, {
-        onConflict: 'sku,ean',
-        ignoreDuplicates: false
-      });
-
-    if (error) throw error;
+    // Perform insert or update
+    if (existingProduct) {
+      // Update existing product
+      const { error } = await supabase
+        .from('stark_products')
+        .update(upsertData)
+        .eq('id', existingProduct.id);
+      
+      if (error) throw error;
+    } else {
+      // Insert new product
+      const { error } = await supabase
+        .from('stark_products')
+        .insert(upsertData);
+      
+      if (error) throw error;
+    }
 
     logger.info(`Upserted product: ${product.sku || product.ean || product.url}`);
 

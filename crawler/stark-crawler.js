@@ -197,16 +197,28 @@ async function extractProduct(page, url) {
   try {
     // Navigate with timeout
     await page.goto(url, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle',
       timeout: config.crawler.timeout
     });
 
-    // Wait for Angular/React to render
-    await page.waitForTimeout(2000);
+    // Wait for Angular to fully render - check if there are any Angular template markers
+    await page.waitForFunction(
+      () => {
+        const body = document.body.innerHTML;
+        // Check if Angular templates are still visible
+        return !body.includes('{{') && !body.includes('}}');
+      },
+      { timeout: 10000 }
+    ).catch(() => {
+      logger.debug('Angular templates may still be present');
+    });
+
+    // Additional wait for dynamic content
+    await page.waitForTimeout(1000);
 
     // Try to wait for specific product elements
     try {
-      await page.waitForSelector('[data-test="product-name"], h1', {
+      await page.waitForSelector('h1:not(:empty)', {
         timeout: 5000
       });
     } catch {
@@ -242,9 +254,16 @@ async function extractProduct(page, url) {
         return null;
       }
 
-      // Extract data
+      // Extract data - check for Angular templates and skip if found
+      const h1Text = document.querySelector('h1')?.textContent?.trim() || '';
+      
+      // Skip if Angular templates are still present
+      if (h1Text.includes('{{') || h1Text.includes('}}')) {
+        return null;
+      }
+      
       const data = {
-        name: document.querySelector('h1, [data-test="product-name"]')?.textContent?.trim(),
+        name: h1Text,
         sku: getByLabel('Varenr'),
         ean: getByLabel('EAN-nr'),
         vvs: getByLabel('VVS-nr'),
@@ -255,10 +274,15 @@ async function extractProduct(page, url) {
         brand: null,
       };
 
-      // Extract price
-      const priceEl = document.querySelector('[class*="price"], [data-price]');
-      if (priceEl) {
-        data.price_text = priceEl.textContent?.trim();
+      // Extract price - look for actual price values, not templates
+      const priceElements = document.querySelectorAll('[class*="price"], [data-price], .product-price, .price');
+      for (const priceEl of priceElements) {
+        const text = priceEl.textContent?.trim() || '';
+        // Skip if it contains Angular templates
+        if (!text.includes('{{') && !text.includes('}}') && text.match(/\d/)) {
+          data.price_text = text;
+          break;
+        }
       }
 
       // Extract stock status
@@ -474,10 +498,26 @@ async function crawl() {
             const product = await extractProduct(page, url);
             stats.productsProcessed++;
 
-            if (product.sku || product.ean) {
+            // Skip if no product data was extracted (Angular templates still visible)
+            if (!product) {
+              logger.debug(`Skipping ${url} - no valid product data`);
+              return;
+            }
+
+            // Skip brand/category pages that aren't actual products
+            if (url.includes('/brands/') || url.includes('/klima/') || 
+                url.includes('/konkurrencebetingelser/')) {
+              logger.debug(`Skipping non-product page: ${url}`);
+              return;
+            }
+
+            // Only save if we have valid SKU/EAN and not template data
+            if ((product.sku || product.ean) && 
+                !product.name?.includes('{{') && 
+                !product.price_text?.includes('{{')) {
               await upsertProduct(product);
             } else {
-              logger.warn(`No SKU/EAN found for: ${url}`);
+              logger.warn(`No valid SKU/EAN or template data found for: ${url}`);
             }
 
             // Progress log

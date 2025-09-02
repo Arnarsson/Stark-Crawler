@@ -7,9 +7,12 @@
   "scripts": {
     "crawl": "node crawler/stark-crawler.js",
     "crawl:postgres": "node crawler/stark-crawler-postgres.js",
-    "test": "node crawler/test-crawler.js",
+    "test": "node test-all-connections.js",
+    "test:crawler": "node crawler/test-crawler.js",
+    "test:supabase": "node test-supabase-data.js",
+    "health": "node health-check-server.js",
     "export": "node scripts/export-csv.js",
-    "setup": "sh scripts/setup.sh",
+    "setup": "./setup-and-test.sh",
     "docker:build": "docker build -t stark-crawler -f docker/Dockerfile .",
     "docker:run": "docker run --env-file .env stark-crawler",
     "lint": "eslint crawler/**/*.js",
@@ -17,18 +20,21 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
-    "playwright": "^1.40.0",
+    "axios": "^1.11.0",
+    "chalk": "^5.6.0",
+    "dotenv": "^16.3.0",
+    "express": "^5.1.0",
     "fast-xml-parser": "^4.3.0",
     "p-queue": "^8.0.0",
+    "pg": "^8.11.3",
+    "playwright": "^1.40.0",
     "undici": "^6.0.0",
-    "winston": "^3.11.0",
-    "dotenv": "^16.3.0",
-    "pg": "^8.11.3"
+    "winston": "^3.11.0"
   },
   "devDependencies": {
+    "@types/node": "^20.10.0",
     "eslint": "^8.55.0",
-    "prettier": "^3.1.0",
-    "@types/node": "^20.10.0"
+    "prettier": "^3.1.0"
   },
   "engines": {
     "node": ">=20.0.0"

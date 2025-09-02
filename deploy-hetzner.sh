@@ -24,11 +24,11 @@ npm install -g pm2
 
 # Clone repository (replace with your repo URL)
 echo "📂 Cloning repository..."
-if [ ! -d "stark-crawler" ]; then
-    git clone https://github.com/your-username/stark-crawler.git
-    cd stark-crawler
+if [ ! -d "Stark-Crawler" ]; then
+    git clone https://github.com/your-username/Stark-Crawler.git
+    cd Stark-Crawler
 else
-    cd stark-crawler
+    cd Stark-Crawler
     git pull
 fi
 

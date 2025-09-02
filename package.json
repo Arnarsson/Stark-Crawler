@@ -12,6 +12,7 @@
     "test:supabase": "node test-supabase-data.js",
     "health": "node health-check-server.js",
     "export": "node scripts/export-csv.js",
+    "fix:skus": "node scripts/fix-defective-skus.js",
     "setup": "./setup-and-test.sh",
     "docker:build": "docker build -t stark-crawler -f docker/Dockerfile .",
     "docker:run": "docker run --env-file .env stark-crawler",

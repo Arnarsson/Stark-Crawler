@@ -431,10 +431,10 @@ async function upsertProduct(product) {
       if (error) throw error;
     }
 
-    logger.info(`Upserted product: ${product.sku || product.ean || product.url}`);
+    logger.info(`✅ SAVED TO SUPABASE: SKU=${product.sku} EAN=${product.ean} Name="${product.name}" Price=${product.price_numeric}`);
 
   } catch (error) {
-    logger.error(`Failed to upsert product:`, error);
+    logger.error(`❌ FAILED TO SAVE TO SUPABASE:`, error);
     stats.errors++;
   }
 }
@@ -465,19 +465,21 @@ async function crawl() {
       await sleep(500); // Rate limit between sitemaps
     }
 
-    // Filter out non-product URLs before processing
+    // ONLY KEEP ACTUAL PRODUCT URLS WITH ID PARAMETERS
     const productUrls = new Set();
     for (const url of allUrls) {
-      // Skip known non-product pages
-      if (url.includes('/klima/') || 
-          url.includes('/brands/') ||
-          url.includes('/konkurrencebetingelser/') ||
-          url.includes('/services/') ||
-          url.includes('/om-stark/') ||
-          url.includes('/kontakt/')) {
-        logger.debug(`Filtering out non-product URL: ${url}`);
+      // ONLY process URLs that have a product ID parameter
+      if (!url.includes('?id=')) {
+        logger.debug(`Skipping URL without product ID: ${url}`);
         continue;
       }
+      
+      // Extra safety: skip ANY URL with klima (including klima-old)
+      if (url.includes('klima')) {
+        logger.debug(`Skipping klima URL: ${url}`);
+        continue;
+      }
+      
       productUrls.add(url);
     }
 

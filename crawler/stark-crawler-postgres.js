@@ -21,14 +21,15 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// PostgreSQL configuration
+// PostgreSQL configuration - Connect to local Supabase
 const dbConfig = {
-  // Use 'postgres' as hostname when running in Docker network
-  host: process.env.DB_HOST || 'postgres',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'stark_products',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD_DIRECT || process.env.DB_PASSWORD || 'postgres_secure_pass_2024',
+  // Connect to host machine's Supabase from Docker container
+  // host.docker.internal resolves to host machine's localhost
+  host: process.env.SUPABASE_DB_HOST || 'host.docker.internal',
+  port: process.env.SUPABASE_DB_PORT || 5432,
+  database: process.env.SUPABASE_DB_NAME || 'postgres',
+  user: process.env.SUPABASE_DB_USER || 'postgres',
+  password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD_DIRECT || '65LEOEDaSVDnvzbrIzzIBGY7937RmEFV',
 };
 
 // Rest of configuration same as original

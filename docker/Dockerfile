@@ -33,8 +33,11 @@ COPY package*.json ./
 # Install Node dependencies
 RUN npm ci --only=production
 
-# Install Playwright browsers with dependencies
-RUN npx playwright install --with-deps chromium
+# Install Playwright and its browsers
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/browsers
+RUN mkdir -p /app/browsers && \
+    npx playwright install chromium && \
+    npx playwright install-deps chromium
 
 # Copy application code
 COPY . .
@@ -42,10 +45,22 @@ COPY . .
 # Create directories
 RUN mkdir -p logs exports
 
+# Create startup script
+RUN echo '#!/bin/sh\n\
+if [ ! -d "/app/browsers/chromium-*" ]; then\n\
+  echo "Installing Playwright browsers..."\n\
+  npx playwright install chromium\n\
+fi\n\
+exec "$@"' > /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh
+
 # Run as non-root user
 RUN groupadd -r crawler && useradd -r -g crawler crawler
 RUN chown -R crawler:crawler /app
 USER crawler
+
+# Use entrypoint to ensure browsers are installed
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Default command
 CMD ["npm", "run", "crawl"]

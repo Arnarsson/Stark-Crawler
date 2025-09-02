@@ -81,7 +81,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./sql:/docker-entrypoint-initdb.d:ro
-      - ./scripts/init-n8n-db.sh:/docker-entrypoint-initdb.d/02-init-n8n.sh:ro
     networks:
       - stark-network
     restart: unless-stopped

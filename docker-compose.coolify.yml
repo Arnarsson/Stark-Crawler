@@ -32,44 +32,27 @@ services:
       - "coolify.name=stark-crawler"
       - "coolify.type=service"
 
-  n8n:
-    image: n8nio/n8n:latest
-    environment:
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-StarkCrawler2024!}
-      - N8N_HOST=0.0.0.0
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - NODE_ENV=production
-      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=n8n
-      - DB_POSTGRESDB_USER=n8n
-      - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD:-n8n_secure_password}
-    volumes:
-      - n8n_data:/home/node/.n8n
-      - ./workflows:/workflows:ro
-    networks:
-      - stark-network
-    restart: unless-stopped
-    depends_on:
-      - postgres
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5678/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    labels:
-      - "coolify.managed=true"
-      - "coolify.name=n8n"
-      - "coolify.type=service"
-      - "coolify.http.enabled=true"
-      - "coolify.http.port=5678"
-      - "coolify.http.path=/"
+  # n8n container removed - using external instance at https://n8n.aigrowthadvisors.cc
+  # To restore local n8n, uncomment the section below:
+  # n8n:
+  #   image: n8nio/n8n:latest
+  #   environment:
+  #     - N8N_BASIC_AUTH_ACTIVE=true
+  #     - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+  #     - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-StarkCrawler2024!}
+  #     - N8N_HOST=0.0.0.0
+  #     - N8N_PORT=5678
+  #     - N8N_PROTOCOL=http
+  #     - NODE_ENV=production
+  #     - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+  #   volumes:
+  #     - n8n_data:/home/node/.n8n
+  #     - ./workflows:/workflows:ro
+  #   networks:
+  #     - stark-network
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - postgres
 
   postgres:
     image: postgres:15-alpine
@@ -77,7 +60,8 @@ services:
       - POSTGRES_DB=stark_products
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres_secure_password}
-      - POSTGRES_MULTIPLE_DATABASES=n8n
+      # n8n database not needed when using external n8n instance
+      # - POSTGRES_MULTIPLE_DATABASES=n8n
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./sql:/docker-entrypoint-initdb.d:ro
@@ -129,9 +113,9 @@ volumes:
   crawler_exports:
     labels:
       - "coolify.managed=true"
-  n8n_data:
-    labels:
-      - "coolify.managed=true"
+  # n8n_data:
+  #   labels:
+  #     - "coolify.managed=true"
   postgres_data:
     labels:
       - "coolify.managed=true"

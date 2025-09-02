@@ -62,5 +62,5 @@ USER crawler
 # Use entrypoint to ensure browsers are installed
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-# Default command - use PostgreSQL version
-CMD ["npm", "run", "crawl:postgres"]
+# Default command - use Supabase REST API
+CMD ["npm", "run", "crawl"]

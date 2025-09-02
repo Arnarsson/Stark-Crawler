@@ -10,7 +10,7 @@ services:
     environment:
       - TZ=Europe/Copenhagen  # Danish timezone (CEST/CET)
       - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_KEY=${SUPABASE_SERVICE_KEY}  # Use service key for full access
+      - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
       - CRAWLER_CONCURRENCY=${CRAWLER_CONCURRENCY:-2}
       - CRAWLER_HEADLESS=${CRAWLER_HEADLESS:-true}

@@ -43,7 +43,8 @@ const config = {
     'https://www.stark.dk/sitemapvariants2.xml'
   ],
   batchSize: 5,
-  maxProducts: 100 // Limit for initial test
+  maxProducts: 200, // Process 200 products
+  startOffset: 1100 // Skip problematic early URLs
 };
 
 // Statistics
@@ -307,8 +308,8 @@ async function crawl() {
     allUrls.push(...urls);
   }
   
-  // Limit for testing
-  const urlsToProcess = allUrls.slice(0, config.maxProducts);
+  // Apply offset and limit
+  const urlsToProcess = allUrls.slice(config.startOffset, config.startOffset + config.maxProducts);
   stats.urlsDiscovered = urlsToProcess.length;
   logger.info(`Processing ${urlsToProcess.length} product URLs`);
   

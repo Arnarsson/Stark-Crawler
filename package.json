@@ -6,6 +6,7 @@
   "main": "crawler/stark-crawler.js",
   "scripts": {
     "crawl": "node crawler/stark-crawler.js",
+    "crawl:dry": "node crawler/stark-crawler.js --dry-run --limit=50",
     "crawl:postgres": "node crawler/stark-crawler-postgres.js",
     "test": "node test-all-connections.js",
     "test:crawler": "node crawler/test-crawler.js",
@@ -28,7 +29,7 @@
     "fast-xml-parser": "^4.3.0",
     "p-queue": "^8.0.0",
     "pg": "^8.11.3",
-    "playwright": "^1.40.0",
+    "playwright": "^1.55.0",
     "undici": "^6.0.0",
     "winston": "^3.11.0"
   },

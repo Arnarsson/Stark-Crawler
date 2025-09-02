@@ -46,6 +46,15 @@ const config = {
   }
 };
 
+// Parse simple CLI flags: --dry-run and --limit=NN
+for (const arg of process.argv.slice(2)) {
+  if (arg === '--dry-run') config.crawler.dryRun = true;
+  if (arg.startsWith('--limit=')) {
+    const n = parseInt(arg.split('=')[1] || '0', 10);
+    if (!Number.isNaN(n) && n > 0) config.crawler.limit = n;
+  }
+}
+
 // Ensure log directory exists
 await fs.mkdir(path.dirname(config.logging.file), { recursive: true }).catch(() => {});
 
@@ -550,14 +559,16 @@ async function upsertProduct(product) {
 async function crawl() {
   logger.info('Starting STARK crawler');
 
-  // Create crawl log entry
-  const { data: crawlLog } = await supabase
-    .from('stark_crawl_logs')
-    .insert({ status: 'running' })
-    .select()
-    .single();
-
-  const crawlId = crawlLog?.id;
+  // Create crawl log entry (skip in dry-run)
+  let crawlId = null;
+  if (!config.crawler.dryRun) {
+    const { data: crawlLog } = await supabase
+      .from('stark_crawl_logs')
+      .insert({ status: 'running' })
+      .select()
+      .single();
+    crawlId = crawlLog?.id || null;
+  }
 
   try {
     // Phase 1: Discover URLs
@@ -613,8 +624,11 @@ async function crawl() {
       intervalCap: 1
     });
 
-    // Process URLs
-    const urlArray = Array.from(productUrls);
+    // Process URLs (respect optional limit in dry-run/testing)
+    let urlArray = Array.from(productUrls);
+    if (config.crawler.limit) {
+      urlArray = urlArray.slice(0, config.crawler.limit);
+    }
     const batchSize = 10;
 
     for (let i = 0; i < urlArray.length; i += batchSize) {
@@ -648,7 +662,20 @@ async function crawl() {
                 !product.price_text?.includes('{{')) {
               // Persist cleaned SKU
               if (validSku) product.sku = cleanedSku;
-              await upsertProduct(product);
+              if (config.crawler.dryRun) {
+                logger.info('DRY-RUN extracted product', {
+                  url,
+                  name: product.name,
+                  sku: product.sku,
+                  ean: product.ean,
+                  price_text: product.price_text,
+                  price_numeric: product.price_numeric,
+                  category: product.category,
+                  subcategory: product.subcategory
+                });
+              } else {
+                await upsertProduct(product);
+              }
             } else {
               logger.warn(`No valid SKU/EAN or template data found for: ${url}`);
             }

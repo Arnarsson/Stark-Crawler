@@ -18,13 +18,13 @@
 git init
 git add .
 git commit -m "Ready for Coolify deployment"
-git remote add origin https://github.com/your-username/stark-crawler.git
+git remote add origin https://github.com/your-username/Stark-Crawler.git
 git push -u origin main
 ```
 
 ### 2. Coolify Configuration
 1. **Login to Coolify** → Your Hetzner server Coolify dashboard
-2. **New Project** → Name: `stark-crawler`
+2. **New Project** → Name: `Stark-Crawler`
 3. **New Resource** → **Docker Compose**
 4. **Git Repository** → Connect your repository
 5. **Docker Compose File** → `docker-compose.coolify.yml`
@@ -63,19 +63,19 @@ Click **Deploy** in Coolify and monitor the build process.
 docker ps
 
 # Verify crawler service
-docker logs stark-crawler-stack_crawler_1
+docker logs Stark-Crawler-stack_crawler_1
 
 # Verify n8n service  
-docker logs stark-crawler-stack_n8n_1
+docker logs Stark-Crawler-stack_n8n_1
 
 # Verify database
-docker logs stark-crawler-stack_postgres_1
+docker logs Stark-Crawler-stack_postgres_1
 ```
 
 ### Database Verification
 ```bash
 # Connect to database
-docker exec -it stark-crawler-stack_postgres_1 psql -U postgres -d stark_products
+docker exec -it Stark-Crawler-stack_postgres_1 psql -U postgres -d stark_products
 
 # Check tables exist
 \dt
@@ -97,10 +97,10 @@ SELECT COUNT(*) FROM stark_products;
 ### Crawler Test
 ```bash
 # Manual test via container
-docker exec stark-crawler-stack_crawler_1 node crawler/test-crawler.js
+docker exec Stark-Crawler-stack_crawler_1 node crawler/test-crawler.js
 
 # Check logs
-docker exec stark-crawler-stack_crawler_1 tail -f logs/crawler.log
+docker exec Stark-Crawler-stack_crawler_1 tail -f logs/crawler.log
 ```
 
 ## 📊 Expected Results

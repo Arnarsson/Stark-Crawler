@@ -13,7 +13,7 @@ This repository is optimized for **one-click deployment** with Coolify on your H
 ## 🚀 Quick Deployment
 
 ### 1. In Coolify Dashboard:
-- **New Project** → `stark-crawler`
+- **New Project** → `Stark-Crawler`
 - **Docker Compose** → Point to this repository
 - **File**: `docker-compose.coolify.yml`
 

@@ -13,7 +13,7 @@
 git init
 git add .
 git commit -m "Initial STARK crawler setup"
-git remote add origin https://github.com/your-username/stark-crawler.git
+git remote add origin https://github.com/your-username/Stark-Crawler.git
 git push -u origin main
 ```
 
@@ -23,12 +23,12 @@ git push -u origin main
    - Navigate to "Projects" → "New Project"
 
 2. **Create New Project**
-   - Name: `stark-crawler`
+   - Name: `Stark-Crawler`
    - Description: `STARK product crawler with n8n automation`
 
 3. **Add Git Repository**
    - Select your Git provider
-   - Repository: `your-username/stark-crawler`
+   - Repository: `your-username/Stark-Crawler`
    - Branch: `main`
    - Deploy Key: Let Coolify generate one
 
@@ -37,7 +37,7 @@ git push -u origin main
 #### Method A: Single Docker Compose Stack (Recommended)
 1. **New Resource** → **Docker Compose**
 2. **Configuration:**
-   - Name: `stark-crawler-stack`
+   - Name: `Stark-Crawler-stack`
    - Docker Compose Location: `docker-compose.coolify.yml`
    - Build Pack: `Docker Compose`
 
@@ -314,13 +314,13 @@ Configure in Coolify:
 docker ps
 
 # Check logs
-docker logs stark-crawler-stack-crawler-1
+docker logs Stark-Crawler-stack-crawler-1
 
 # Database connection test
 psql -h localhost -p 5432 -U postgres -d stark_products
 
 # Manual crawler run
-docker exec stark-crawler-stack-crawler-1 node crawler/test-crawler.js
+docker exec Stark-Crawler-stack-crawler-1 node crawler/test-crawler.js
 
 # n8n workflow import
 curl -X POST http://n8n.yourdomain.com/api/v1/workflows/import \

@@ -62,5 +62,5 @@ USER crawler
 # Use entrypoint to ensure browsers are installed
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-# Default command
-CMD ["npm", "run", "crawl"]
+# Default command - use PostgreSQL version
+CMD ["npm", "run", "crawl:postgres"]

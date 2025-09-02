@@ -25,7 +25,7 @@ const __dirname = path.dirname(__filename);
 const config = {
   supabase: {
     url: process.env.SUPABASE_URL,
-    key: process.env.SUPABASE_KEY,
+    key: process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY,  // Try service key first
   },
   crawler: {
     concurrency: parseInt(process.env.CRAWLER_CONCURRENCY || '2'),
@@ -74,7 +74,9 @@ const logger = winston.createLogger({
 
 // Validate environment
 if (!config.supabase.url || !config.supabase.key) {
-  logger.error('Missing SUPABASE_URL or SUPABASE_KEY');
+  logger.error('Missing SUPABASE_URL or SUPABASE_KEY/SUPABASE_SERVICE_KEY');
+  logger.error(`URL: ${config.supabase.url}`);
+  logger.error(`Key: ${config.supabase.key ? 'Present' : 'Missing'}`);
   process.exit(1);
 }
 

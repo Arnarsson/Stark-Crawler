@@ -1,0 +1,141 @@
+# Coolify-optimized Docker Compose for STARK Crawler
+# This version is specifically configured for Coolify deployment
+version: '3.8'
+
+services:
+  crawler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - CRAWLER_CONCURRENCY=${CRAWLER_CONCURRENCY:-2}
+      - CRAWLER_HEADLESS=${CRAWLER_HEADLESS:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NODE_ENV=production
+    volumes:
+      - crawler_logs:/app/logs
+      - crawler_exports:/app/exports
+    networks:
+      - stark-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "coolify.managed=true"
+      - "coolify.name=stark-crawler"
+      - "coolify.type=service"
+
+  n8n:
+    image: n8nio/n8n:latest
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-StarkCrawler2024!}
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD:-n8n_secure_password}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/workflows:ro
+    networks:
+      - stark-network
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "coolify.managed=true"
+      - "coolify.name=n8n"
+      - "coolify.type=service"
+      - "coolify.http.enabled=true"
+      - "coolify.http.port=5678"
+      - "coolify.http.path=/"
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=stark_products
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres_secure_password}
+      - POSTGRES_MULTIPLE_DATABASES=n8n
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d:ro
+      - ./scripts/init-n8n-db.sh:/docker-entrypoint-initdb.d/02-init-n8n.sh:ro
+    networks:
+      - stark-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stark_products"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "coolify.managed=true"
+      - "coolify.name=postgres"
+      - "coolify.type=service"
+
+  # Optional: Database administration interface
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@stark-crawler.com}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-admin_secure_password}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - stark-network
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    labels:
+      - "coolify.managed=true"
+      - "coolify.name=pgadmin"
+      - "coolify.type=service"
+      - "coolify.http.enabled=true"
+      - "coolify.http.port=80"
+      - "coolify.http.path=/"
+
+networks:
+  stark-network:
+    driver: bridge
+    labels:
+      - "coolify.managed=true"
+
+volumes:
+  crawler_logs:
+    labels:
+      - "coolify.managed=true"
+  crawler_exports:
+    labels:
+      - "coolify.managed=true"
+  n8n_data:
+    labels:
+      - "coolify.managed=true"
+  postgres_data:
+    labels:
+      - "coolify.managed=true"
+  pgadmin_data:
+    labels:
+      - "coolify.managed=true"

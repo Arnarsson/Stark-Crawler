@@ -196,9 +196,15 @@ async function extractProduct(page, url) {
 
   try {
     // Navigate with timeout
+    // Use shorter timeout for pages that might be slow
     await page.goto(url, {
-      waitUntil: 'networkidle',
-      timeout: config.crawler.timeout
+      waitUntil: 'domcontentloaded',  // Faster than networkidle
+      timeout: 30000  // 30 seconds instead of 60
+    });
+    
+    // Wait for network to settle but with shorter timeout
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+      logger.debug('Network did not idle, continuing anyway');
     });
 
     // Wait for Angular to fully render - check if there are any Angular template markers
@@ -459,8 +465,24 @@ async function crawl() {
       await sleep(500); // Rate limit between sitemaps
     }
 
-    stats.urlsDiscovered = allUrls.size;
-    logger.info(`Discovered ${allUrls.size} product URLs`);
+    // Filter out non-product URLs before processing
+    const productUrls = new Set();
+    for (const url of allUrls) {
+      // Skip known non-product pages
+      if (url.includes('/klima/') || 
+          url.includes('/brands/') ||
+          url.includes('/konkurrencebetingelser/') ||
+          url.includes('/services/') ||
+          url.includes('/om-stark/') ||
+          url.includes('/kontakt/')) {
+        logger.debug(`Filtering out non-product URL: ${url}`);
+        continue;
+      }
+      productUrls.add(url);
+    }
+
+    stats.urlsDiscovered = productUrls.size;
+    logger.info(`Discovered ${productUrls.size} product URLs (filtered from ${allUrls.size} total)`);
 
     // Phase 2: Extract products
     logger.info('Phase 2: Extracting product data');
@@ -485,7 +507,7 @@ async function crawl() {
     });
 
     // Process URLs
-    const urlArray = Array.from(allUrls);
+    const urlArray = Array.from(productUrls);
     const batchSize = 10;
 
     for (let i = 0; i < urlArray.length; i += batchSize) {
@@ -504,9 +526,9 @@ async function crawl() {
               return;
             }
 
-            // Skip brand/category pages that aren't actual products
-            if (url.includes('/brands/') || url.includes('/klima/') || 
-                url.includes('/konkurrencebetingelser/')) {
+            // Double-check: skip if likely not a product page
+            if (!url.includes('?id=') && (url.includes('/brands/') || url.includes('/klima/') || 
+                url.includes('/konkurrencebetingelser/'))) {
               logger.debug(`Skipping non-product page: ${url}`);
               return;
             }
@@ -522,7 +544,7 @@ async function crawl() {
 
             // Progress log
             if (stats.productsProcessed % 10 === 0) {
-              logger.info(`Progress: ${stats.productsProcessed}/${allUrls.size}`);
+              logger.info(`Progress: ${stats.productsProcessed}/${productUrls.size}`);
             }
 
           } catch (error) {

@@ -247,17 +247,28 @@ async function extractProduct(page, url) {
 
     // Extract product details
     const product = await page.evaluate(() => {
-      // Helper to find text by label
-      function getByLabel(label) {
-        const elements = Array.from(document.querySelectorAll('*'));
-        for (const el of elements) {
-          if (el.textContent?.includes(label)) {
-            const text = el.textContent;
-            const match = text.match(new RegExp(
-              `${label}[:\\s]*([\\w\\-\\.\\#\\s/]+)`, 'i'
-            ));
-            if (match?.[1]) return match[1].trim();
+      // Extract SKU from URL (most reliable for STARK)
+      function getSkuFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const id = urlParams.get('id');
+        if (id) {
+          // Format is usually: 2880-1987003 where 1987003 is the SKU
+          const parts = id.split('-');
+          if (parts.length === 2 && /^\d+$/.test(parts[1])) {
+            return parts[1];
           }
+        }
+        return null;
+      }
+      
+      // Helper to find product codes by label
+      function getByLabel(label) {
+        // Only look in specific areas to avoid random text
+        const productInfo = document.querySelector('.product-info, .product-details, [class*="product"]');
+        if (productInfo) {
+          const text = productInfo.textContent;
+          const match = text.match(new RegExp(`${label}[:\\s]*([0-9\\-]+)`, 'i'));
+          if (match?.[1]) return match[1].trim();
         }
         return null;
       }
@@ -270,11 +281,14 @@ async function extractProduct(page, url) {
         return null;
       }
       
+      // Get SKU from URL first (most reliable)
+      const sku = getSkuFromUrl() || getByLabel('Varenr');
+      
       const data = {
         name: h1Text,
-        sku: getByLabel('Varenr'),
-        ean: getByLabel('EAN-nr'),
-        vvs: getByLabel('VVS-nr'),
+        sku: sku,
+        ean: getByLabel('EAN-nr') || getByLabel('EAN'),
+        vvs: getByLabel('VVS-nr') || getByLabel('VVS'),
         price_text: null,
         in_stock: null,
         category: null,

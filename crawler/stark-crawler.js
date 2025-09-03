@@ -46,6 +46,15 @@ const config = {
   }
 };
 
+// Parse simple CLI flags: --dry-run and --limit=NN
+for (const arg of process.argv.slice(2)) {
+  if (arg === '--dry-run') config.crawler.dryRun = true;
+  if (arg.startsWith('--limit=')) {
+    const n = parseInt(arg.split('=')[1] || '0', 10);
+    if (!Number.isNaN(n) && n > 0) config.crawler.limit = n;
+  }
+}
+
 // Ensure log directory exists
 await fs.mkdir(path.dirname(config.logging.file), { recursive: true }).catch(() => {});
 
@@ -247,66 +256,144 @@ async function extractProduct(page, url) {
 
     // Extract product details
     const product = await page.evaluate(() => {
-      // Helper to find text by label
-      function getByLabel(label) {
-        const elements = Array.from(document.querySelectorAll('*'));
-        for (const el of elements) {
-          if (el.textContent?.includes(label)) {
-            const text = el.textContent;
-            const match = text.match(new RegExp(
-              `${label}[:\\s]*([\\w\\-\\.\\#\\s/]+)`, 'i'
-            ));
-            if (match?.[1]) return match[1].trim();
-          }
+      // Helpers
+      const normalizeSpaces = (s) => (s || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+
+      function extractByLabelFromText(bodyText, label, valuePattern) {
+        const re = new RegExp(`${label}\.?:?\s*(${valuePattern})`, 'i');
+        const m = bodyText.match(re);
+        return m ? normalizeSpaces(m[1]) : null;
+      }
+
+      function cleanDigits(s) {
+        if (!s) return null;
+        const only = (s + '').replace(/[^0-9]/g, '');
+        return only || null;
+      }
+
+      function extractSku(bodyText) {
+        // Typical STARK pattern: 4 digits + 6-12 digits (vendor + item)
+        const m1 = bodyText.match(/Varenr\.?\s*[:#]?\s*([0-9]{4})\s*[- ]\s*([0-9]{6,12})/i);
+        if (m1) return cleanDigits(m1[1] + m1[2]);
+        // Fallback: number sequence after label, then normalize to first 4 + 6-12 group combination
+        const m2 = bodyText.match(/Varenr\.?\s*[:#]?\s*([0-9][0-9\s-]{9,24})/i);
+        if (m2) {
+          const s = m2[1];
+          const m = s.match(/([0-9]{4})[\s-]*([0-9]{6,12})/);
+          if (m) return cleanDigits(m[1] + m[2]);
         }
+        // As last resort, look for standalone vendor+item pattern anywhere
+        const m3 = bodyText.match(/([0-9]{4})\s*[- ]\s*([0-9]{6,12})/);
+        if (m3) return cleanDigits(m3[1] + m3[2]);
         return null;
       }
 
+      function extractEan(bodyText) {
+        const m = bodyText.match(/EAN(?:-nr)?\.?\s*[:#]?\s*(\d{12,14})/i);
+        return m ? cleanDigits(m[1]) : null;
+      }
+
+      function extractVvs(bodyText) {
+        const m = bodyText.match(/VVS(?:-nr)?\.?\s*[:#]?\s*([0-9][0-9\s-]{5,})/i);
+        return m ? cleanDigits(m[1]) : null;
+      }
+
+      function findPriceText() {
+        const candidates = [];
+        // Prefer obvious price containers
+        const priceSelectors = [
+          '[data-price]',
+          '[class*="price"]',
+          '.product-price',
+          '.price',
+          '.price-wrapper .price',
+          '.regular-price',
+        ];
+        try {
+          document.querySelectorAll(priceSelectors.join(',')).forEach((el) => {
+            const text = normalizeSpaces(el.textContent || '');
+            if (!text) return;
+            // Skip Angular/Vue templates
+            if (text.includes('{{') || text.includes('}}')) return;
+            // Require price context to avoid picking dimensions like "10 cm"
+            if (!/(kr|dkk|pris|medlemspris)/i.test(text)) return;
+            candidates.push(text);
+          });
+        } catch {}
+
+        // As a fallback, scan for lines that contain 'pris' or 'kr'
+        if (candidates.length === 0) {
+          const body = normalizeSpaces(document.body.innerText || '');
+          body.split(/\n|\r/).forEach((line) => {
+            if (/(kr|dkk|pris|medlemspris)/i.test(line)) {
+              const clean = normalizeSpaces(line);
+              if (!clean.includes('{{') && /\d/.test(clean)) candidates.push(clean);
+            }
+          });
+        }
+
+        if (candidates.length === 0) return null;
+
+        // Choose the candidate with the highest numeric value (usually the actual price)
+        const parseCandidate = (t) => {
+          const nums = (t.match(/[0-9][0-9\s.,]*[0-9]|[0-9]/g) || []).map((n) => n);
+          let best = null;
+          for (const n of nums) {
+            const normalized = n.replace(/\s+/g, '').replace(/\./g, '').replace(',', '.');
+            const val = parseFloat(normalized);
+            if (!isNaN(val)) best = Math.max(best ?? 0, val);
+          }
+          return best ?? null;
+        };
+
+        let bestText = null;
+        let bestValue = null;
+        for (const t of candidates) {
+          const v = parseCandidate(t);
+          if (v != null && (bestValue == null || v > bestValue)) {
+            bestValue = v;
+            bestText = t;
+          }
+        }
+
+        return bestText || null;
+      }
+
       // Extract data - check for Angular templates and skip if found
-      const h1Text = document.querySelector('h1')?.textContent?.trim() || '';
-      
-      // Skip if Angular templates are still present
+      const h1 = document.querySelector('h1');
+      const h1Text = normalizeSpaces(h1?.textContent || '');
+
       if (h1Text.includes('{{') || h1Text.includes('}}')) {
         return null;
       }
-      
+
+      const bodyText = normalizeSpaces(document.body?.innerText || '');
+
       const data = {
-        name: h1Text,
-        sku: getByLabel('Varenr'),
-        ean: getByLabel('EAN-nr'),
-        vvs: getByLabel('VVS-nr'),
-        price_text: null,
+        name: h1Text || null,
+        sku: extractSku(bodyText),
+        ean: extractEan(bodyText),
+        vvs: extractVvs(bodyText),
+        price_text: findPriceText(),
         in_stock: null,
         category: null,
         subcategory: null,
         brand: null,
       };
 
-      // Extract price - look for actual price values, not templates
-      const priceElements = document.querySelectorAll('[class*="price"], [data-price], .product-price, .price');
-      for (const priceEl of priceElements) {
-        const text = priceEl.textContent?.trim() || '';
-        // Skip if it contains Angular templates
-        if (!text.includes('{{') && !text.includes('}}') && text.match(/\d/)) {
-          data.price_text = text;
-          break;
-        }
-      }
-
       // Extract stock status
-      const stockEl = document.querySelector('[class*="stock"], [data-stock]');
+      const stockEl = document.querySelector('[class*="stock"], [data-stock], .stock-status, .availability');
       if (stockEl) {
-        const stockText = stockEl.textContent?.toLowerCase() || '';
-        data.in_stock = stockText.includes('lager') ||
-                       stockText.includes('tilgængelig');
+        const stockText = normalizeSpaces(stockEl.textContent || '').toLowerCase();
+        data.in_stock = stockText.includes('lager') || stockText.includes('tilgængelig');
       }
 
       // Extract breadcrumbs for category
-      const breadcrumbs = document.querySelectorAll('[class*="breadcrumb"] a');
+      const breadcrumbs = document.querySelectorAll('[class*="breadcrumb"] a, .breadcrumbs a, nav[aria-label="breadcrumb"] a');
       if (breadcrumbs.length > 1) {
-        data.category = breadcrumbs[1]?.textContent?.trim();
+        data.category = normalizeSpaces(breadcrumbs[1]?.textContent || '');
         if (breadcrumbs.length > 2) {
-          data.subcategory = breadcrumbs[2]?.textContent?.trim();
+          data.subcategory = normalizeSpaces(breadcrumbs[2]?.textContent || '');
         }
       }
 
@@ -327,13 +414,17 @@ async function extractProduct(page, url) {
       }
     }
 
-    // Parse numeric price
-    if (product.price_text) {
-      const priceMatch = product.price_text.match(/[\d.,]+/);
-      if (priceMatch) {
-        product.price_numeric = parseFloat(
-          priceMatch[0].replace('.', '').replace(',', '.')
-        );
+    // Parse numeric price (handle Danish formats)
+    if (product?.price_text) {
+      const txt = String(product.price_text)
+        .replace(/\u00a0/g, ' ')
+        .replace(/kr\.?/i, '')
+        .replace(/DKK/i, '');
+      const match = txt.match(/[0-9][0-9\s.,]*[0-9]|[0-9]/);
+      if (match) {
+        const normalized = match[0].replace(/\s+/g, '').replace(/\./g, '').replace(',', '.');
+        const num = parseFloat(normalized);
+        if (!Number.isNaN(num)) product.price_numeric = num;
       }
     }
 
@@ -370,6 +461,21 @@ async function upsertProduct(product) {
         .eq('ean', product.ean)
         .single();
       existingProduct = data;
+    }
+
+    // Fallback: try to find existing row by URL (covers previously-saved rows with bad SKU like '. 1234 ...')
+    if (!existingProduct && product.url) {
+      try {
+        const { data } = await supabase
+          .from('stark_products')
+          .select('*')
+          .eq('url', product.url)
+          .limit(1)
+          .maybeSingle();
+        if (data) existingProduct = data;
+      } catch (_) {
+        // ignore 'no rows' errors
+      }
     }
 
     // Prepare upsert data
@@ -415,6 +521,12 @@ async function upsertProduct(product) {
       }
     }
 
+    // If existing row has a defective SKU starting with '.', replace it with the cleaned one when available
+    if (existingProduct && upsertData.sku && (existingProduct.sku?.trim()?.startsWith('.'))) {
+      // Force the cleaned SKU onto the existing row
+      existingProduct.sku = upsertData.sku;
+    }
+
     // Perform insert or update
     if (existingProduct) {
       // Update existing product
@@ -447,14 +559,16 @@ async function upsertProduct(product) {
 async function crawl() {
   logger.info('Starting STARK crawler');
 
-  // Create crawl log entry
-  const { data: crawlLog } = await supabase
-    .from('stark_crawl_logs')
-    .insert({ status: 'running' })
-    .select()
-    .single();
-
-  const crawlId = crawlLog?.id;
+  // Create crawl log entry (skip in dry-run)
+  let crawlId = null;
+  if (!config.crawler.dryRun) {
+    const { data: crawlLog } = await supabase
+      .from('stark_crawl_logs')
+      .insert({ status: 'running' })
+      .select()
+      .single();
+    crawlId = crawlLog?.id || null;
+  }
 
   try {
     // Phase 1: Discover URLs
@@ -510,8 +624,11 @@ async function crawl() {
       intervalCap: 1
     });
 
-    // Process URLs
-    const urlArray = Array.from(productUrls);
+    // Process URLs (respect optional limit in dry-run/testing)
+    let urlArray = Array.from(productUrls);
+    if (config.crawler.limit) {
+      urlArray = urlArray.slice(0, config.crawler.limit);
+    }
     const batchSize = 10;
 
     for (let i = 0; i < urlArray.length; i += batchSize) {
@@ -537,11 +654,28 @@ async function crawl() {
               return;
             }
 
-            // Only save if we have valid SKU/EAN and not template data
-            if ((product.sku || product.ean) && 
+            // Only save if we have valid identifiers and not template data
+            const cleanedSku = product?.sku ? String(product.sku).replace(/[^0-9]/g, '') : null;
+            const validSku = cleanedSku && cleanedSku.length >= 10 && cleanedSku.length <= 16;
+            if ((validSku || product.ean) && 
                 !product.name?.includes('{{') && 
                 !product.price_text?.includes('{{')) {
-              await upsertProduct(product);
+              // Persist cleaned SKU
+              if (validSku) product.sku = cleanedSku;
+              if (config.crawler.dryRun) {
+                logger.info('DRY-RUN extracted product', {
+                  url,
+                  name: product.name,
+                  sku: product.sku,
+                  ean: product.ean,
+                  price_text: product.price_text,
+                  price_numeric: product.price_numeric,
+                  category: product.category,
+                  subcategory: product.subcategory
+                });
+              } else {
+                await upsertProduct(product);
+              }
             } else {
               logger.warn(`No valid SKU/EAN or template data found for: ${url}`);
             }

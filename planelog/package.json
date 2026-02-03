@@ -1,0 +1,17 @@
+{
+  "name": "planelog-cli",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "My Plane Log CLI",
+  "bin": {
+    "myplanelog": "./myplanelog-cli.js"
+  },
+  "scripts": {
+    "start": "node myplanelog-cli.js"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "chalk": "^5.6.0"
+  },
+  "license": "MIT"
+}

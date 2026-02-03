@@ -7,37 +7,38 @@ This CLI lets you authenticate with My Plane Log and manage your flights from th
 From the repo root:
 
 ```bash
+cd planelog
 npm install
 ```
 
 ## Usage
 
 ```bash
-node cli/myplanelog-cli.js --help
+node myplanelog-cli.js --help
 ```
 
 ### Save a token
 
 ```bash
-node cli/myplanelog-cli.js login --username you@example.com --token "PASTE_TOKEN"
+node myplanelog-cli.js login --username you@example.com --token "PASTE_TOKEN"
 ```
 
 ### List flights
 
 ```bash
-node cli/myplanelog-cli.js flights list --username you@example.com --limit 50 --out pretty
+node myplanelog-cli.js flights list --username you@example.com --limit 50 --out pretty
 ```
 
 ### Add a flight
 
 ```bash
-node cli/myplanelog-cli.js flights add --username you@example.com --date 2026-02-02 --flight SK123
+node myplanelog-cli.js flights add --username you@example.com --date 2026-02-02 --flight SK123
 ```
 
 ### Export
 
 ```bash
-node cli/myplanelog-cli.js export --username you@example.com --format csv --output flights.csv
+node myplanelog-cli.js export --username you@example.com --format csv --output flights.csv
 ```
 
 ## Configuration
@@ -58,4 +59,4 @@ export MPL_FLIGHTS_PATH="/api/flights"
 ## Notes
 
 - The default flights endpoint is `/api/flights`.
-- If the API expects different JSON keys, adjust the payload in `cli/myplanelog-cli.js`.
+- If the API expects different JSON keys, adjust the payload in `myplanelog-cli.js`.

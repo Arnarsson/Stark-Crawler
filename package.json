@@ -18,8 +18,7 @@
     "docker:build": "docker build -t stark-crawler -f docker/Dockerfile .",
     "docker:run": "docker run --env-file .env stark-crawler",
     "lint": "eslint crawler/**/*.js",
-    "format": "prettier --write '**/*.{js,json,md}'",
-    "myplanelog": "node cli/myplanelog-cli.js"
+    "format": "prettier --write '**/*.{js,json,md}'"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
